@@ -138,7 +138,7 @@ def make_wiki_representation(data, item_id):
         #print(icon) 
     if icon == None:
         return None
-        # switch if not only outputting unknown icons (strings), also remove else
+        # change these lines depending on which items to output(icons known/unknown)
         #icon = '-icon'
         #icon = data['icon']+'-icon'
     else:
@@ -192,3 +192,34 @@ def get_item(key, item_file):
       wiki_entry[attrib_naming.get(i.get('name'))] = int(int(i.get('value'))/100)
   
   return (e.get('name'), make_wiki_representation(wiki_entry, key))
+
+
+def lootboxify(lootbox_label, item_names, additional_label=''):
+  sorted_items = sorted(list(item_names))
+  if additional_label != '':
+    additional_label = ' - ' + additional_label
+  result = '{{Lootbox|'+lootbox_label+additional_label+'\n'
+  for item in sorted_items:
+    result+="|Item:"+item+'\n'
+  return result+'}}\n'
+
+def tablify(table_label, item_names, additional_label=''):
+  sorted_items = sorted(list(item_names))
+  if additional_label != '':
+    additional_label = ' - ' + additional_label
+  result = '{| class="altRowsMed collapsible collapsed" width="600"\n! ' + table_label + additional_label + '\n|-\n'
+  for item in sorted_items:
+    result+="| {{Reward|"+item+"}}\n|-\n"
+  return result+'|}\n'
+
+def construct_drop_information(chests, instance_name):
+  chests = sorted(chests)
+  dropinfo = ""
+  if len(chests) == 1:
+    dropinfo = chests[0]
+  else:
+    dropinfo = ", ".join(chests[:-1]) + " and " + chests[-1]
+  item_information = """
+== Item Information ==
+This item is a possible drop in the [[{}]] instance from {}.""".format(instance_name, dropinfo)
+  return item_information
