@@ -129,22 +129,19 @@ def make_wiki_representation(data, item_id):
     if 'Armour' in data:
         data['armour'] = f"{data['Armour']:,}"
     
-    icon = get_icon(data['icon'])
-    if icon == '':
-        icon = iconhelper.get_wiki_icon(data['icon'])
+
+    # set to True if icon ids should be used, False to attempt to use wiki names for icons
+    use_icon_id = True
+    if use_icon_id:
+      data['icon'] = data['icon'] + '-icon'
     else:
-        icon += '-icon'
-    #if icon is not None:
-        #print(icon) 
-    if icon == None:
+      icon = get_icon(data['icon']) + '-icon'
+      if icon == '-icon':
+          icon = iconhelper.get_wiki_icon(data['icon'])
+      data['icon'] = icon
+      if icon is None:
         return None
-        # change these lines depending on which items to output(icons known/unknown)
-        #icon = '-icon'
-        #icon = data['icon']+'-icon'
-    else:
-        #return None
-        pass
-    data['icon'] = icon
+
     text = f"""
 <onlyinclude>{{{{Item Tooltip
 | mode            = {{{{{{mode|}}}}}}

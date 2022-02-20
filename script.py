@@ -10,15 +10,15 @@ markers = ET.parse('../../LotRO Companion\\app\data\lore\maps\markers\markers-2-
 
 # Find all loot from a certain instance chest
 
-def getNameFromItemId(itemId):
-  item = items.find('item[@key="'+itemId+'"]')
+def getNameFromItemId(item_id):
+  item = items.find('item[@key="'+item_id+'"]')
   return item.get('name')
 
 def getInstanceNameFromChestId(chest_id):
   pzid = markers.find('marker[@did="'+chest_id+'"]').get('parentZoneId')
   pencs = ET.parse('../../LotRO Companion\\app\data\lore\privateEncounters.xml')
-  zoneId = pencs.find(f'.//skirmishPrivateEncounter/instanceMap/zone[@zoneId="{pzid}"]....').get('name')
-  return zoneId
+  zone_id = pencs.find(f'.//skirmishPrivateEncounter/instanceMap/zone[@zoneId="{pzid}"]....').get('name')
+  return zone_id
 
 def getItemIds(trophyListId): # return all items in that trophy list tree
   trophyList = loots.find('trophyList[@id="'+trophyListId+'"]')
@@ -46,68 +46,123 @@ def getTreasures(treasureListId):
       treasureItemIds.add(itemsTableEntry.get('itemId'))
   return treasureItemIds
 
-container_id = "1879421336"
-marker = markers.find('marker[@did="'+container_id+'"]')
-lootbox_label = marker.get('label')
-
-result = containers.find('container[@id="'+container_id+'"]')
-
-filteredTrophyTableID = result.get('filteredTrophyTableId')
-filteredTrophyTableId2 = result.get('filteredTrophyTableId2') # TODO add enhancement runes: How to output quality and level?
-treasureListId = result.get('treasureListId')
+def getAllItemsWithName(item_name):
+    return items.findall('item[@name="'+item_name+'"]')
 
 
-trophies = loots.find('filteredTrophyTable[@id="'+filteredTrophyTableID+'"]')
+def get_items_from_container(container_id):
+  result = containers.find('container[@id="'+container_id+'"]')
 
-treasureItemIds = getTreasures(treasureListId)
+  filteredTrophyTableID = result.get('filteredTrophyTableId')
+  filteredTrophyTableId2 = result.get('filteredTrophyTableId2') # TODO add enhancement runes: How to output quality and level?
+  treasureListId = result.get('treasureListId')
 
-for child in trophies:
-  armour_class = child.get('requiredClass')
-  if armour_class == 'Beorning;Captain;Champion;Guardian;Brawler':
-    heavy = child.get('trophyListId')
-  elif armour_class == 'Burglar;Hunter;Warden':
-    medium = child.get('trophyListId')
-  elif armour_class == 'Lore-master;Minstrel;Rune-keeper':
-    light = child.get('trophyListId')
+
+  trophies = loots.find('filteredTrophyTable[@id="'+filteredTrophyTableID+'"]')
+
+  if treasureListId:
+    treasureItemIds = getTreasures(treasureListId)
+
+  required_class = {}
+  for child in trophies:
+    required_class[child.get('requiredClass')] = child.get('trophyListId')
+    
+  loot_items = {}
+  for class_, trophylist in required_class.items():
+    loot_items[class_] = getItemIds(trophylist)
+  common_items = {}
+  if loot_items:
+    common_items = set(list(loot_items.values())[0]).intersection(*loot_items.values())
+
+  for class_, values in loot_items.items():
+    for e in common_items:
+      if e in values:
+        values.remove(e)
   
-heavyItems = set(getItemIds(heavy))
-mediumItems = set(getItemIds(medium))
-lightItems = set(getItemIds(light))
+  loot_items['Common'] = list(common_items)
+  return loot_items
 
-itemIds = heavyItems | mediumItems | lightItems
-onlyHeavy = heavyItems - mediumItems - lightItems
-onlyMedium = mediumItems - lightItems - heavyItems
-onlyLight = lightItems - mediumItems - heavyItems
+def create_container_loot_table(loot_items, container_id):
+  marker = markers.find('marker[@did="'+container_id+'"]')
+  lootbox_label = marker.get('label')
+  class_to_armour = {
+    'Beorning;Captain;Champion;Guardian;Brawler': 'Heavy Armour',
+    'Burglar;Hunter;Warden': 'Medium Armour',
+    'Lore-master;Minstrel;Rune-keeper': 'Light Armour'
+  }
+  output = []
+  for class_, item_ids in loot_items.items():
+    if class_ in class_to_armour:
+      class_ = class_to_armour[class_]
+    output.append(wikihelper.tablify(lootbox_label, map(getNameFromItemId,item_ids), class_))
+    # print(wikihelper.tablify(lootbox_label, map(getNameFromItemId,treasureItemIds), 'Cosmetics')) TODO
+  return output
 
-commonItems = itemIds - onlyHeavy - onlyMedium - onlyLight
-
-# print(wikihelper.tablify(lootbox_label, map(getNameFromItemId,onlyHeavy), 'Heavy Armour'))
-# print(wikihelper.tablify(lootbox_label, map(getNameFromItemId,onlyMedium), 'Medium Armour'))
-# print(wikihelper.tablify(lootbox_label, map(getNameFromItemId,onlyLight), 'Light Armour'))
-# print(wikihelper.tablify(lootbox_label, map(getNameFromItemId,commonItems), 'Other'))
-# print(wikihelper.tablify(lootbox_label, map(getNameFromItemId,treasureItemIds), 'Cosmetics'))
-
-# def getAllItemsWithName(item_name):
-#   return items.findall('item[@name="'+item_name+'"]')
-
-all_info = ""
-for _id in itemIds - commonItems:
-#for _id in treasureItemIds:
-  item_name, item_wiki_format = wikihelper.get_item(_id, items)
+def create_wiki_page(item_id, container_id):
+  item_name, item_wiki_format = wikihelper.get_item(item_id, items)
   if item_wiki_format is None:
     print("No icon available, skipping Item: " + item_name)
-    continue
-  item_wiki_format = item_name + "\n" + item_wiki_format
-  chests = itemhelper.get_source_chests(_id, markers)
+    return None
+  chests = itemhelper.get_source_chests(item_id, markers)
   item_information = wikihelper.construct_drop_information([chestname for key,chestname in chests], getInstanceNameFromChestId(container_id))
-  disenchantment = itemhelper.get_disenchantment(_id)
+  disenchantment = itemhelper.get_disenchantment(item_id)
   item_information += "\n{{Disenchant |"+disenchantment[0]+"| "+ disenchantment[1]+"}}"
   item_wiki_format += item_information
   number_of_items_with_name = len(getAllItemsWithName(item_name))
   if number_of_items_with_name > 1:
-    print("Attention! There are {} items with this name! Skipping item.".format(number_of_items_with_name))
+    print(f"Attention! There are {number_of_items_with_name} items with this name! Skipping item {item_name}")
   else:
-    all_info += "Begin Item:\n" + item_wiki_format + "\n"
+    return {'name': item_name, 'wiki_format': item_wiki_format}
 
-  # with open('chestdrops', 'w', encoding='utf8') as chestdrops:
-  #   chestdrops.write(all_info)
+
+
+def wiki_pages_for_loot_from_containers(containers):
+  result = []
+  all_items = set()
+  for container_id in containers:
+    item_ids = item_ids = get_items_from_container(container_id)
+    for itemlist in item_ids.values():
+      [all_items.add(a) for a in itemlist]
+    [all_items.discard(e) for e in item_ids.get('Common')]
+    # TODO ignoring items that drop for all classes currently
+    # TODO item sets
+  for item_id in all_items:
+    res = create_wiki_page(item_id, container_id)
+    if res:
+      item_name = res['name']
+      wiki_format = res['wiki_format']
+      result.append(f"Begin Item:\n{item_name}\n{wiki_format}\n")   
+  return result
+
+def output_to_file(string_to_write, filename="output.txt"):
+  with open(filename, 'w', encoding='utf8') as outputfile:
+    outputfile.write(string_to_write)
+
+
+def create_wiki_tables_for_containers(containers):
+  output = []
+  for container_id in container_ids:
+    output = output + create_container_loot_table(get_items_from_container(container_id), container_id)
+  return output
+
+# Hiddenhoard containers (B1 T1-5, B2 T1-5, B3 T1-5)
+container_ids = ["1879441352",
+"1879441344",
+"1879441347",
+"1879441340",
+"1879441342",
+"1879441353",
+"1879441349",
+"1879441351",
+"1879441345",
+"1879441348",
+"1879441350",
+"1879441343",
+"1879441346",
+"1879441339",
+"1879441341"]
+
+output = wiki_pages_for_loot_from_containers(container_ids)
+# output = create_wiki_tables_for_containers(container_ids)
+
+output_to_file("".join(output))
