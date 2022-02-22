@@ -35,22 +35,21 @@ def get_disenchantment(item_id):
 def get_source_chests(item_key, markers):
   tables = []
   for items_table in loots.iter('itemsTable'):
-    ites = items_table.find("itemsTableEntry[@itemId='{}']".format(item_key))
-    
+    ites = items_table.find(f"itemsTableEntry[@itemId='{item_key}']")
     if ites is not None:
       tables.append(items_table)
+  
   table_ids = [a.get('id') for a in tables]
   trophies = []
   for trophy_list in loots.iter('trophyList'):
     for a in table_ids:
-      if trophy_list.find("trophyListEntry[@treasureGroupProfileId='{}']".format(a)) is not None:
+      if trophy_list.find(f"trophyListEntry[@treasureGroupProfileId='{a}']") is not None:
         trophies.append(trophy_list.get('id'))
       
-  
   trophy_tables = []
   for filtered_trophy_table in loots.iter('filteredTrophyTable'):
     for a in trophies:
-      if filtered_trophy_table.find("filteredTrophyTableEntry[@trophyListId='{}']".format(a)) is not None:
+      if filtered_trophy_table.find(f"filteredTrophyTableEntry[@trophyListId='{a}']") is not None:
         trophy_tables.append(filtered_trophy_table.get('id'))
 
   contained_in = []
@@ -62,7 +61,7 @@ def get_source_chests(item_key, markers):
         contained_in.append(e.get('id'))
   
   lootboxes = []
-  # does not check all markers, how to do that efficiently?
+  # TODO only checks containers in supplied markers file
   for elem in markers.iter('markers'):
     for e in elem:
       if e.get('did') in contained_in:

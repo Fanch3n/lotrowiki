@@ -1,4 +1,17 @@
 import itemhelper, iconhelper
+import xml.etree.ElementTree as ET
+
+stats = ET.parse('../../LotRO Companion/app/data/lore/stats.xml')
+
+stats_names = {}
+
+for s in stats.findall('.//stat'):
+  lkey = s.get('legacyKey')
+  key = s.get('key')
+  name = s.get('name')
+  isPercentage = s.get('isPercentage')
+  stats_names[lkey] = {'name': name, 'isPercentage': isPercentage}
+  stats_names[key] = {'name': name, 'isPercentage': isPercentage}
 
 def get_icon(icon_identifier):
     d = {
@@ -68,99 +81,72 @@ def get_icon(icon_identifier):
     return d.get(icon_identifier, "")
 
 def get_binding(binding):
-    b = {
-        "BIND_ON_EQUIP": "BoE",
-        "BOUND_TO_ACCOUNT_ON_ACQUIRE": "BtAoA",
-        "BIND_ON_ACQUIRE": "BoA"
-    }
-    return b.get(binding)
-
-attrib_list = ["Agility", "Might", "Will", "Vitality",
-"Block Rating", "Parry", "Physical Mastery Rating", "Tactical Mastery Rating",
-"Critical Rating", "Finesse Rating", "Outgoing Healing Rating", "Fate", "Evade Rating",
-"Physical Mitigation", "Tactical Mitigation", "Critical Defence", "Incoming Healing Rating",
-"Resistance Rating", "All Skill Inductions"]
-
-attrib_naming = {
-    "WILL": "Will",
-    "VITALITY": "Vitality",
-    "TACTICAL_MASTERY": "Tactical Mastery Rating",
-    "TACTICAL_MITIGATION": "Tactical Mitigation",
-    "CRITICAL_DEFENCE": "Critical Defence",
-    "CRITICAL_RATING": "Critical Rating",
-    "MIGHT": "Might",
-    "PARRY": "Parry",
-    "INCOMING_HEALING": "Incoming Healing Rating",
-    "PHYSICAL_MITIGATION": "Physical Mitigation",
-    "OUTGOING_HEALING": "Outgoing Healing Rating",
-    "AGILITY": "Agility",
-    "FATE": "Fate",
-    "BLOCK": "Block Rating",
-    "EVADE": "Evade Rating",
-    "FINESSE": "Finesse Rating",
-    "PHYSICAL_MASTERY": 'Physical Mastery Rating',
-    "ARMOUR": "Armour",
-    "ALL_SKILL_INDUCTION": "All Skill Inductions",
-    "LIGHT_OF_EARENDIL": "Light of Eärendil",
-    "RESISTANCE": "Resistance Rating"
-}
+  b = {
+    "BIND_ON_EQUIP": "BoE",
+    "BOUND_TO_ACCOUNT_ON_ACQUIRE": "BtAoA",
+    "BIND_ON_ACQUIRE": "BoA"
+  }
+  return b.get(binding)
 
 # incomplete
 params_ordered_list = ["icon", "disambigpage", "quality", "item_level", "scaled", "containsitems", "unique_use", "unique", "indestructible", "consumed", "cosmetic", "bind", "slot", "type", "armour", "essences",
-                         "attrib", "durability", "dur_class", "level", "class", "sell"]
+                         "attrib", "durability", "dur_class", "level", "class", "set", "sell"]
 
 def add_item_param(param, data):
-    return '\n| {:<16}= {}'.format(param, data)
+  return '\n| {:<16}= {}'.format(param, data)
 
 def make_wiki_representation(data, item_id):
-    data['disambigpage'] = "{{subst:FULLPAGENAME}}"
-    name = data.pop('name')
-    if data['quality'] == 'Legendary':
-      data['quality'] = 'Epic'
-    attribs = ""
-    for attrib in attrib_list:
-        if attrib in data:
-            attribs += "" if attribs == "" else " <br> "
-            temp = data[attrib]
-            if attrib in ["Agility", "Might", "Vitality", "Fate", "Will"]:
-                temp = f'{temp:,}'
-            attribs += f"+{temp} {attrib}"
-    data['attrib'] = attribs
-    if 'Armour' in data:
-        data['armour'] = f"{data['Armour']:,}"
-    
+  data['disambigpage'] = "{{subst:FULLPAGENAME}}"
+  if data['quality'] == 'Legendary':
+    data['quality'] = 'Epic'
+  statslist = []
+  for stat in data.get('stats'):
+    value = stat.get('value')
+    name = stat.get('name')
+    perc = stat.get('isPercentage')
+    if name is None:
+      print(f"Stat not found for item {item_id}, add to attrib_naming")
+    if name in ["Agility", "Might", "Vitality", "Fate", "Will"]:
+      value = f'{int(value):,}'
+    if name == "Armour":
+      data['armour'] = f'{int(value):,}'
+      continue
+    statslist.append(f'+{value}{"%" if perc else ""} {name}')
+  data['attrib'] = " <br> ".join(statslist)
 
-    # set to True if icon ids should be used, False to attempt to use wiki names for icons
-    use_icon_id = True
-    if use_icon_id:
-      data['icon'] = data['icon'] + '-icon'
-    else:
-      icon = get_icon(data['icon']) + '-icon'
-      if icon == '-icon':
-          icon = iconhelper.get_wiki_icon(data['icon'])
-      data['icon'] = icon
-      if icon is None:
-        return None
+  if 'Armour' in data:
+    data['armour'] = f"{data['Armour']:,}"
+  
 
-    text = f"""
+  # set to True if icon ids should be used, False to attempt to use wiki names for icons
+  use_icon_id = True
+  if use_icon_id:
+    data['icon'] = data['icon'] + '-icon'
+  else:
+    icon = get_icon(data['icon']) + '-icon'
+    if icon == '-icon':
+      icon = iconhelper.get_wiki_icon(data['icon'])
+    data['icon'] = icon
+    if icon is None:
+      return None
+
+  text = f"""
 <onlyinclude>{{{{Item Tooltip
 | mode            = {{{{{{mode|}}}}}}
 | arg             = {{{{{{arg|}}}}}}
 | amount          = {{{{{{amount|}}}}}}
 | name            = {{{{subst:PAGENAME}}}}"""
-    for key in params_ordered_list:
-        if key in data and data[key] is not None:
-            text += add_item_param(key, data[key])
-    return text + "\n}}</onlyinclude>__NOTOC__"
+  for key in params_ordered_list:
+    if key in data and data[key] is not None:
+      text += add_item_param(key, data[key])
+  return text + "\n}}</onlyinclude>__NOTOC__"
+# TODO add param for item id
 
-
-def get_item(key, item_file):
+def get_item(key, item_file, set_name=None):
   e = item_file.find('item[@key="'+str(key)+'"]')
-  i_stats = item_file.findall('item[@key="'+str(key)+'"]//')
-    
-  wiki_entry = {}
+  i_stats = item_file.findall('item[@key="'+str(key)+'"]/stats/stat')
   
-  wiki_entry['name'] = e.attrib['name']
+  wiki_entry = {}  
   wiki_entry['quality'] = e.get('quality').capitalize() 
   wiki_entry['level'] = e.get('minLevel')
   wiki_entry['bind'] = get_binding(e.get('binding'))
@@ -181,13 +167,19 @@ def get_item(key, item_file):
     wiki_entry['type'] = armour_type.capitalize() + ' Armour'
   wiki_entry['essences'] = e.get('slots')
   wiki_entry['icon'] = e.get('icon')
+  if set_name:
+    wiki_entry['set'] = set_name
   value = itemhelper.get_item_value(e.get('valueTableId'), e.get('level'), e.get('quality'))
   wiki_entry['sell'] = f'{{{{worth|g={int(value / 100000) or ""}|s={int(value / 100) % 1000 or ""}|c={int(value % 100) or ""}|dp=}}}}'
 
-  for i in i_stats:
-    if 'name' in i.attrib and i.get('name') != 'LIGHT_OF_EARENDIL':
-      wiki_entry[attrib_naming.get(i.get('name'))] = int(int(i.get('value'))/100)
-  
+  if i_stats:
+    wiki_entry['stats'] = []
+    for stat in i_stats:
+      stat_info = stats_names.get(stat.get('name'))
+      c = stat.get('constant')
+      stat_value = c if c else stat.get('value')[:-2]
+      wiki_entry['stats'].append({'name': stat_info.get('name'), 'value': stat_value, 'isPercentage': stat_info.get('isPercentage')})
+
   return (e.get('name'), make_wiki_representation(wiki_entry, key))
 
 

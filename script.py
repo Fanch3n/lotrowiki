@@ -1,4 +1,3 @@
-
 import xml.etree.ElementTree as ET
 import itemhelper, wikihelper
 
@@ -55,8 +54,10 @@ def get_items_from_container(container_id):
 
   filteredTrophyTableID = result.get('filteredTrophyTableId')
   filteredTrophyTableId2 = result.get('filteredTrophyTableId2') # TODO add enhancement runes: How to output quality and level?
+  filtered_trophy_table_id3 = result.get('filteredTrophyTableId3')
+  trophy_list_id = result.get('trophyListId')
   treasureListId = result.get('treasureListId')
-
+  # TODO most of these seem to be duplicates (so are included already), but should be handled properly
 
   trophies = loots.find('filteredTrophyTable[@id="'+filteredTrophyTableID+'"]')
 
@@ -99,7 +100,12 @@ def create_container_loot_table(loot_items, container_id):
   return output
 
 def create_wiki_page(item_id, container_id):
-  item_name, item_wiki_format = wikihelper.get_item(item_id, items)
+  sets = ET.parse('../../LotRO Companion\\app\data\lore\sets.xml')
+  set_ = sets.find(f'.//set/item[@id="{item_id}"]..')
+  set_name = None
+  if set_:
+    set_name = set_.get('name').replace('\n', ' ')    
+  item_name, item_wiki_format = wikihelper.get_item(item_id, items, set_name)
   if item_wiki_format is None:
     print("No icon available, skipping Item: " + item_name)
     return None
@@ -118,14 +124,15 @@ def create_wiki_page(item_id, container_id):
 
 def wiki_pages_for_loot_from_containers(containers):
   result = []
-  all_items = set()
+  all_items = {}
   for container_id in containers:
-    item_ids = item_ids = get_items_from_container(container_id)
+    item_ids = get_items_from_container(container_id)
     for itemlist in item_ids.values():
-      [all_items.add(a) for a in itemlist]
-    [all_items.discard(e) for e in item_ids.get('Common')]
+      for a in itemlist:
+        all_items[a] = None
+    for e in item_ids.get('Common'):
+      all_items.pop(e)
     # TODO ignoring items that drop for all classes currently
-    # TODO item sets
   for item_id in all_items:
     res = create_wiki_page(item_id, container_id)
     if res:
@@ -147,22 +154,32 @@ def create_wiki_tables_for_containers(containers):
 
 # Hiddenhoard containers (B1 T1-5, B2 T1-5, B3 T1-5)
 container_ids = ["1879441352",
-"1879441344",
-"1879441347",
-"1879441340",
-"1879441342",
-"1879441353",
-"1879441349",
-"1879441351",
-"1879441345",
-"1879441348",
-"1879441350",
-"1879441343",
-"1879441346",
-"1879441339",
+# "1879441344",
+# "1879441347",
+# "1879441340",
+# "1879441342",
+# "1879441353",
+# "1879441349",
+# "1879441351",
+# "1879441345",
+# "1879441348",
+# "1879441350",
+# "1879441343",
+# "1879441346",
+# "1879441339",
 "1879441341"]
 
 output = wiki_pages_for_loot_from_containers(container_ids)
 # output = create_wiki_tables_for_containers(container_ids)
+# print(wikihelper.get_item("1879433509", items)[1])
 
 output_to_file("".join(output))
+
+
+# sets = ET.parse('../../LotRO Companion\\app\data\lore\sets.xml')
+# id = '1879444347'
+# set_ = sets.find(f'.//set/item[@id="{id}"]..')
+# set_name = set_.get('name')
+# set_maxlvl = set_.get('maxLevel')
+# set_description = set_.get('description')
+# set_bonuses = set_.findall('.//bonus')
