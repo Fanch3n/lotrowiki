@@ -14,6 +14,8 @@ if __name__ == "__main__":
 
 def get_disenchantment(item_id):
   item = disenchantments.find(f"disenchantment[@sourceItemId='{item_id}']")
+  if item is None:
+    return None
   quantity = item.get('quantity')
   result_name = item.get('name')
   if quantity is None:
@@ -32,7 +34,7 @@ def get_disenchantment(item_id):
   return (quantity, result_name)
 
 
-def get_source_chests(item_key, markers):
+def get_source_chests(item_key: str, markers) -> list:
   tables = []
   for items_table in loots.iter('itemsTable'):
     ites = items_table.find(f"itemsTableEntry[@itemId='{item_key}']")
@@ -45,13 +47,19 @@ def get_source_chests(item_key, markers):
     for a in table_ids:
       if trophy_list.find(f"trophyListEntry[@treasureGroupProfileId='{a}']") is not None:
         trophies.append(trophy_list.get('id'))
-      
+  
+  treasures = []
+  for treasure_list in loots.iter('treasureList'):
+    for a in table_ids:
+      if treasure_list.find(f"treasureListEntry[@treasureGroupProfileId='{a}']") is not None:
+        treasures.append(treasure_list.get('id'))
+  
   trophy_tables = []
   for filtered_trophy_table in loots.iter('filteredTrophyTable'):
     for a in trophies:
       if filtered_trophy_table.find(f"filteredTrophyTableEntry[@trophyListId='{a}']") is not None:
         trophy_tables.append(filtered_trophy_table.get('id'))
-
+  trophy_tables.extend(treasures)
   contained_in = []
   for elem in containers.iter('containers'):
     for e in elem:
@@ -67,7 +75,6 @@ def get_source_chests(item_key, markers):
       if e.get('did') in contained_in:
         lootboxes.append((e.get('id'), e.get('label')))
   return lootboxes
-
 
 
 def get_item_value(value_table_id, ilvl, iquality):
