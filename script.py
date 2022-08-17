@@ -1,12 +1,14 @@
 import xml.etree.ElementTree as ET
 import itemhelper, wikihelper
 
-#items = ET.parse('../../LotRO Companion\\app\data\lore\items.xml')
-items = ET.parse('../../items.xml')
+items = ET.parse('../../LotRO Companion\\app\data\lore\items.xml')
+# items = ET.parse('../../items.xml')
 containers = ET.parse('../../LotRO Companion\\app\data\lore\containers.xml')
 loots = ET.parse('../../LotRO Companion\\app\data\lore\loots.xml')
-markers = ET.parse('../../LotRO Companion\\app\data\lore\maps\markers\markers-2-14-15.xml') # AZ
+# markers = ET.parse('../../LotRO Companion\\app\data\lore\maps\markers\markers-2-14-15.xml') # AZ
 # markers = ET.parse('../../LotRO Companion\\app\data\lore\maps\markers\markers-2-15-13.xml') # Pughlak
+markers = ET.parse('../../LotRO Companion\\app\data\lore\maps\markers\markers-4-15-15.xml') # Gath Daeroval
+# markers = ET.parse('../../LotRO Companion\\app\data\lore\maps\markers\markers-4-15-14.xml') # Eithel Gwaur
 
 def getNameFromItemId(item_id):
   if item_id.startswith("Random level-adjusted Tracery"):
@@ -85,17 +87,26 @@ def check_for_tracery_trophy_table(table_id):
     return None
 
 def get_items_from_container(container_id):
+  print(container_id)
   result = containers.find('container[@id="'+container_id+'"]')
 
   filtered_trophy_table_id = result.get('filteredTrophyTableId')
   filtered_trophy_table_id_2 = result.get('filteredTrophyTableId2')
   filtered_trophy_table_id_3 = result.get('filteredTrophyTableId3')
   trophy_list_id = result.get('trophyListId')
-  trophies = loots.find('filteredTrophyTable[@id="'+filtered_trophy_table_id+'"]')
+
+  trophies = []
+  if filtered_trophy_table_id:
+    trophies = loots.find('filteredTrophyTable[@id="'+filtered_trophy_table_id+'"]')
   
   required_class = {}
+  common = []
   for child in trophies:
-    required_class[child.get('requiredClass')] = child.get('trophyListId')
+    c = child.get('requiredClass')
+    if c == None:
+      common = child.get('trophyListId')
+    else:
+      required_class[c] = child.get('trophyListId')
     
   loot_items = {}
   for class_, trophylist in required_class.items():
@@ -110,6 +121,8 @@ def get_items_from_container(container_id):
         values.remove(e)
   
   loot_items['Common'] = list(common_items)
+  if common:
+    loot_items['Common'].extend(getItemIds(common))
   trophy_list_items = get_trophy_list_items_from_container(trophy_list_id)
   trophies_2_items = check_for_tracery_trophy_table(filtered_trophy_table_id_2)
   if not trophies_2_items:
@@ -130,6 +143,7 @@ def create_container_loot_table(loot_items, container_id, group_by='armour'):
   marker = markers.find('marker[@did="'+container_id+'"]')
   lootbox_label = marker.get('label')
   class_to_armour = {
+    'Beorning;Brawler': "Heavy Armour",
     'Beorning;Captain;Champion;Guardian;Brawler': 'Heavy Armour',
     'Burglar;Hunter;Warden': 'Medium Armour',
     'Lore-master;Minstrel;Rune-keeper': 'Light Armour'
@@ -201,27 +215,6 @@ def create_wiki_tables_for_containers(containers):
     output = output + create_container_loot_table(get_items_from_container(container_id), container_id)
   return output
 
-def get_item_stat(progression: str, ilvl: int):
-  progressions = ET.parse('../../LotRO Companion/app/data/lore/progressions.xml')
-  prog = progressions.findall(f"linearInterpolationProgression[@identifier='{progression}']/")
-  x_lower = -1
-  y_lower = 0
-  x_higher = 1000
-  y_higher = 0
-  for e in prog:
-    cur_att = int(e.attrib['x'])
-    if cur_att > x_lower and cur_att <= ilvl:
-      x_lower = cur_att
-      y_lower = float(e.attrib['y'])
-    if cur_att < x_higher and cur_att >= ilvl:
-      x_higher = cur_att
-      y_higher = float(e.attrib['y'])
-  return linear_interpolation(x_lower, y_lower, x_higher, y_higher, ilvl)
-
-    
-def linear_interpolation(x0, y0, x1, y1, x):
-    return (y0 * (x1 - x) + y1 * (x - x0)) / (x1 - x0)
-
 def construct_set_piece_string(item_id):
   e = items.find('item[@key="'+item_id+'"]')
   quality = e.get('quality')
@@ -255,7 +248,6 @@ def construct_set_bonus_string(effects):
       bonus_effects.append(f"{base_text}&nbsp;&nbsp;{effect['specialEffect']}")
   return "\n".join(bonus_effects)
 
-
 def construct_set_page(set_id):
   sets = ET.parse('../../LotRO Companion\\app\data\lore\sets.xml')
   set_ = sets.find(f'.//set[@id="{set_id}"]')
@@ -273,7 +265,7 @@ def construct_set_page(set_id):
       c = n.get('constant')
       effect = {}
       if c is None:
-        c = str(int(get_item_stat(n.get('scaling'), int(set_level))))
+        c = str(int(itemhelper.get_item_stat(n.get('scaling'), int(set_level))))
       else:
         effect['isPercentage'] = True
       effect['name'] = wikihelper.stats_names.get(n.get('name')).get('name')
@@ -311,28 +303,10 @@ set_ids = ["1879444526", "1879444522", "1879444513", "1879444497", "1879444493",
  "1879444352", "1879444351", "1879444339", "1879444327", "1879444326", "1879444316",
  "1879444313", "1879444301", "1879444292", "1879444284", "1879444276", "1879444272", "1879444266"]
 
-conts = """1879441968
-1879441976
-1879441970
-1879441973
-1879441969
-1879441967
-1879441978
-1879441980
-1879441975
-1879441977
-1879441969
-1879441971
-1879441965
-1879441964
-1879441981
-1879441979
-1879441972
-1879441974"""
+conts = """1879220127"""
 
 # Hiddenhoard containers (B1 T1-5, B2 T1-5, B3 T1-5)
 container_ids = [
-  "1879441976" # AZ
 #  "1879441352",
 #  "1879441344",
 # "1879441347",
@@ -360,12 +334,22 @@ container_ids = conts.split('\n')
 #   set_results.append(set_name + "\n" + construct_set_page(i))
 
 # output = "\nNew Set Item\n".join(set_results)
-output = wiki_pages_for_loot_from_containers(container_ids)
+# output = wiki_pages_for_loot_from_containers(container_ids)
 # output = create_wiki_tables_for_containers(container_ids)
 # output = get_treasure_from_container("1879441974")
 # output = []
 # for c_id in container_ids:
 #   output.append(get_treasure_from_container(c_id))
 # print(wikihelper.get_item("1879433509", items)[1])
+# output = wikihelper.get_item("1879069995", items)
+
+# items_ = items.findall(f'item[@name="Morgul Explorer\'s Delicate Armlet"]')
+# output_to_file(wikihelper.construct_disambig_page("Bold Bracelet"))
+# wikihelper.get_item("1879116453", items, name_only=True)
+# for item in [x.get('key') for x in items_]:
+#   output.append(wikihelper.get_item(item, items)[0]+'\n')
+#   output.append(wikihelper.get_item(item, items)[1]+'\n')
+
+output = wikihelper.get_item("1879448630", items)
 
 output_to_file("".join(output))

@@ -11,6 +11,26 @@ def main():
 if __name__ == "__main__":
   main()
 
+def get_item_stat(progression: str, ilvl: int):
+  progressions = ET.parse('../../LotRO Companion/app/data/lore/progressions.xml')
+  prog = progressions.findall(f"linearInterpolationProgression[@identifier='{progression}']/")
+  x_lower = -1
+  y_lower = 0
+  x_higher = 1000
+  y_higher = 0
+  for e in prog:
+    cur_att = int(e.attrib['x'])
+    if cur_att > x_lower and cur_att <= ilvl:
+      x_lower = cur_att
+      y_lower = float(e.attrib['y'])
+    if cur_att < x_higher and cur_att >= ilvl:
+      x_higher = cur_att
+      y_higher = float(e.attrib['y'])
+  return str(linear_interpolation(x_lower, y_lower, x_higher, y_higher, ilvl))
+
+    
+def linear_interpolation(x0, y0, x1, y1, x):
+    return (y0 * (x1 - x) + y1 * (x - x0)) / (x1 - x0)
 
 def get_disenchantment(item_id):
   item = disenchantments.find(f"disenchantment[@sourceItemId='{item_id}']")
